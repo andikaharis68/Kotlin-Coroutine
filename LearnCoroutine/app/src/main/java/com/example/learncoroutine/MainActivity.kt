@@ -8,67 +8,59 @@ import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.core.view.isVisible
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.observe
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.learncoroutine.databinding.ActivityMainBinding
+import com.example.learncoroutine.recycler.DataLoopViewAdapter
+import com.example.learncoroutine.repository.DataLoopRepositoryImpl
 import kotlinx.android.synthetic.main.activity_main.*
+import kotlinx.android.synthetic.main.card_view.*
+import kotlinx.coroutines.*
 import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
-
-    var start = true
-    var startValue = 1
-    var max = 0
-    var time = 0.0
+    private lateinit var binding : ActivityMainBinding
+    private lateinit var viewModel : MainActivityViewModel
+    private lateinit var viewAdapter: DataLoopViewAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-    }
+        initViewModel()
+        subscribe()
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        binding.apply {
+            recycle_view.apply {
+                layoutManager = LinearLayoutManager(this@MainActivity)
+                viewAdapter = DataLoopViewAdapter()
+                adapter = viewAdapter
+            }
 
-    fun inputValue(view: View?){
-        if(view == input_bt){
-            if (input_et.text.toString() == ""){
-                Toast.makeText(this, "you must input number", Toast.LENGTH_SHORT).show()
-            } else {
-                max = input_et.text.toString().toInt()
-                progressBar.max = max
-                max_value.text = "Max Value = $max"
-                startValue = 1
+            btStart.setOnClickListener {
+                val maxValue = editTextInput.text.toString().toInt()
+                viewModel.playLoop(maxValue)
+            }
+            btStop.setOnClickListener {
+                viewModel.stopLoop()
             }
         }
     }
 
-    fun startProgress(view: View?){
-        thread(true) {
-            if (view == pencet){
-                start = true
-                for (i in startValue..max){
-                    Thread.sleep(1000)
-                    time = i * 1000.0
-                    startValue = i
-                    if (!start){
-                        break
-                    }
-                    runOnUiThread{
-                        progressBar.progress = i
-                        if(i%2==0){
-                            tv_value.text = "$i Genap"
-                        } else {
-                            tv_value.text = "$i Ganjil"
-                        }
-                        time_tv.text = "Total Time = $time ms"
-                        pencet?.isEnabled = false
-                    }
-                }
-                runOnUiThread {
-                    pencet?.isEnabled = true
-                }
+    private fun initViewModel(){
+        viewModel = ViewModelProvider(this, object:ViewModelProvider.Factory {
+            override fun <T : ViewModel?> create(modelClass: Class<T>): T {
+                val repositoryImpl = DataLoopRepositoryImpl()
+                return MainActivityViewModel(repositoryImpl) as T
             }
-        }
+        }).get(MainActivityViewModel::class.java)
     }
 
-    fun stopProgress(view: View?){
-        if (view == stop_bt){
-            start = false
+    private fun subscribe(){
+        viewModel.dataLoopLiveData.observe(this) {
+            viewAdapter.setDataLoop(it)
+            binding.recycleView.adapter = viewAdapter
         }
     }
 }
